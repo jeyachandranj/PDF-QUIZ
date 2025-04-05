@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF MCQ Quiz with</title>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.9.179/build/pdf.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (typeof pdfjsLib !== "undefined") {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.9.179/build/pdf.worker.min.js';
+            } else {
+                console.error("pdfjsLib is not defined. Ensure that the script is loading properly.");
+            }
+        });
+    </script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --secondary: #f3f4f6;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background-color: #f9fafb;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 992px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .app-header {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .app-description {
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 25px;
+            height: auto;
+        }
+
+        .pdf-viewer {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .pdf-controls {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .pdf-dropzone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 15px;
+        }
+
+        .pdf-dropzone:hover,
+        .pdf-dropzone.active {
+            border-color: var(--primary);
+            background-color: rgba(79, 70, 229, 0.05);
+        }
+
+        .pdf-dropzone p {
+            margin-bottom: 10px;
+        }
+
+        .pdf-canvas-container {
+            overflow-y: auto;
+            flex-grow: 1;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            height: 500px;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto 10px;
+            max-width: 100%;
+        }
+
+        .page-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        #total-pages {
+            display: inline-block;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .quiz-section {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .quiz-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            height: 400px;
+        }
+
+        .quiz-config {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .quiz-config input[type="number"] {
+            width: 80px;
+        }
+
+        .question-container {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: var(--secondary);
+        }
+
+        .question-text {
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            background-color: white;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .option-item:hover {
+            border-color: var(--primary);
+        }
+
+        .option-item.selected {
+            background-color: rgba(79, 70, 229, 0.1);
+            border-color: var(--primary);
+        }
+
+        .option-item.correct {
+            background-color: rgba(16, 185, 129, 0.1);
+            border-color: var(--success);
+        }
+
+        .option-item.incorrect {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-color: var(--error);
+        }
+
+        .quiz-results {
+            padding: 15px;
+            background-color: var(--secondary);
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .quiz-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+
+        .question-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        input,
+        button,
+        select,
+        textarea {
+            font-family: inherit;
+            font-size: 1rem;
+            padding: 10px 15px;
+            border-radius: 6px;
+            outline: none;
+            border: 1px solid var(--border);
+        }
+
+        input:focus,
+        button:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        input,
+        textarea {
+            width: 100%;
+        }
+
+        button {
+            cursor: pointer;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:disabled {
+            background-color: var(--border);
+            cursor: not-allowed;
+        }
+
+        .notification {
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .error {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border-left: 4px solid var(--error);
+        }
+
+        .success {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border-left: 4px solid var(--success);
+        }
+
+        .warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border-left: 4px solid var(--warning);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 5px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loader-text {
+            text-align: center;
+            color: var(--text-secondary);
+            margin: 10px 0;
+            font-style: italic;
+        }
+
+        .mcq-topic-container {
+            margin-bottom: 15px;
+        }
+
+        .quiz-progress {
+            margin-top: 10px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background-color: var(--border);
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1>PDF MCQ Quiz</h1>
+            <p class="app-description">Upload a PDF document and generate multiple-choice questions from its content.
+                Test your knowledge and see your score!</p>
+            <div class="notification error" id="error-notification"></div>
+        </header>
+
+        <section class="panel">
+            <div class="pdf-viewer">
+                <h2>Document Viewer</h2>
+                <div class="pdf-controls">
+                    <input type="file" id="pdf-file" accept="application/pdf" style="display: none;">
+                    <button id="upload-btn">Upload PDF</button>
+                    <select id="zoom-level">
+                        <option value="0.5">50%</option>
+                        <option value="0.75">75%</option>
+                        <option value="1" selected>100%</option>
+                        <option value="1.25">125%</option>
+                        <option value="1.5">150%</option>
+                        <option value="2">200%</option>
+                    </select>
+                </div>
+
+                <div class="pdf-dropzone" id="dropzone">
+                    <p>Drag & drop your PDF here</p>
+                    <p>or</p>
+                    <button>Select File</button>
+                </div>
+
+                <div class="pdf-canvas-container" id="pdf-container">
+                    <!-- PDF pages will be rendered here -->
+                </div>
+
+                <div class="page-controls">
+                    <button id="prev-page">Previous</button>
+                    <span>Page <span id="current-page">0</span> of <span id="total-pages">0</span></span>
+                    <button id="next-page">Next</button>
+                </div>
+
+                <div class="loader-text" id="extraction-status"></div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="quiz-section">
+                <h2>MCQ Quiz Generator</h2>
+
+                <div class="mcq-topic-container">
+                    <label for="quiz-topic">Quiz Topic (optional):</label>
+                    <input type="text" id="quiz-topic"
+                        placeholder="Enter a specific topic or leave blank for general questions">
+                </div>
+
+                <div class="quiz-config">
+                    <div>
+                        <label for="num-questions">Number of Questions:</label>
+                        <input type="number" id="num-questions" min="1" max="10" value="5">
+                    </div>
+                    <div>
+                        <label for="difficulty">Difficulty:</label>
+                        <select id="difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <button id="generate-quiz-btn" disabled>
+                        Generate Quiz <span id="generate-btn-loader" class="loading" style="display: none;"></span>
+                    </button>
+                </div>
+
+                <div class="quiz-container" id="quiz-container">
+                    <p class="loader-text">Upload a PDF to generate MCQ questions based on its content.</p>
+                </div>
+
+                <div class="quiz-progress" id="quiz-progress" style="display: none;">
+                    <div>Question <span id="current-question">1</span> of <span id="total-questions">5</span></div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // API Key for Groq
+            const GROQ_API_KEY = "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";
+
+            // PDF Viewer Elements
+            const uploadBtn = document.getElementById('upload-btn');
+            const fileInput = document.getElementById('pdf-file');
+            const dropzone = document.getElementById('dropzone');
+            const pdfContainer = document.getElementById('pdf-container');
+            const prevBtn = document.getElementById('prev-page');
+            const nextBtn = document.getElementById('next-page');
+            const currentPageEl = document.getElementById('current-page');
+            const totalPagesEl = document.getElementById('total-pages');
+            const zoomSelect = document.getElementById('zoom-level');
+            const extractionStatus = document.getElementById('extraction-status');
+
+            // Quiz Elements
+            const quizContainer = document.getElementById('quiz-container');
+            const generateQuizBtn = document.getElementById('generate-quiz-btn');
+            const numQuestionsInput = document.getElementById('num-questions');
+            const difficultySelect = document.getElementById('difficulty');
+            const topicInput = document.getElementById('quiz-topic');
+            const errorNotification = document.getElementById('error-notification');
+            const generateBtnLoader = document.getElementById('generate-btn-loader');
+            const quizProgress = document.getElementById('quiz-progress');
+            const currentQuestionEl = document.getElementById('current-question');
+            const totalQuestionsEl = document.getElementById('total-questions');
+            const progressFill = document.getElementById('progress-fill');
+
+            // PDF.js variables
+            let pdfDoc = null;
+            let pageNum = 1;
+            let pageRendering = false;
+            let pageNumPending = null;
+            let scale = 1.0;
+
+            // Document text content
+            let documentText = "";
+
+            // Quiz variables
+            let quizQuestions = [];
+            let currentQuestionIndex = 0;
+            let userAnswers = [];
+            let quizSubmitted = false;
+
+            // Initialize PDF viewer
+            uploadBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', handleFileSelect);
+
+            // Drag and drop functionality
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('active');
+            });
+
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('active');
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('active');
+
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    handleFileSelect(e);
+                }
+            });
+
+            dropzone.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // Page navigation
+            prevBtn.addEventListener('click', () => {
+                if (pageNum <= 1) return;
+                pageNum--;
+                queueRenderPage(pageNum);
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (pageNum >= pdfDoc.numPages) return;
+                pageNum++;
+                queueRenderPage(pageNum);
+            });
+
+            // Zoom functionality
+            zoomSelect.addEventListener('change', () => {
+                scale = parseFloat(zoomSelect.value);
+                queueRenderPage(pageNum);
+            });
+
+            // Generate Quiz
+            generateQuizBtn.addEventListener('click', async () => {
+                const numQuestions = parseInt(numQuestionsInput.value);
+                const difficulty = difficultySelect.value;
+                const topic = topicInput.value.trim();
+
+                if (numQuestions < 1 || numQuestions > 10) {
+                    showError('Please enter a number of questions between 1 and 10.');
+                    return;
+                }
+
+                // Show loading
+                generateBtnLoader.style.display = 'inline-block';
+                generateQuizBtn.disabled = true;
+                quizContainer.innerHTML = '<p class="loader-text">Generating MCQ questions... This might take a moment.</p>';
+
+                try {
+                    quizQuestions = await generateMCQQuestions(numQuestions, difficulty, topic);
+                    totalQuestionsEl.textContent = quizQuestions.length;
+                    currentQuestionIndex = 0;
+                    userAnswers = new Array(quizQuestions.length).fill(null);
+                    quizSubmitted = false;
+                    displayCurrentQuestion();
+                    quizProgress.style.display = 'block';
+                } catch (error) {
+                    showError(`Error: ${error.message}`);
+                    quizContainer.innerHTML = '<p class="loader-text">Failed to generate questions. Please try again.</p>';
+                } finally {
+                    generateBtnLoader.style.display = 'none';
+                    generateQuizBtn.disabled = false;
+                }
+            });
+
+            // Function to handle file selection
+            function handleFileSelect(event) {
+                // Reset
+                pdfContainer.innerHTML = '';
+                documentText = "";
+                quizContainer.innerHTML = '<p class="loader-text">Upload a PDF to generate MCQ questions based on its content.</p>';
+                quizProgress.style.display = 'none';
+
+                const file = event.target.files[0] || event.dataTransfer.files[0];
+                if (!file || file.type !== 'application/pdf') {
+                    showError('Please upload a valid PDF file.');
+                    return;
+                }
+
+                // Hide dropzone, show PDF container
+                dropzone.style.display = 'none';
+                pdfContainer.style.display = 'block';
+
+                const fileReader = new FileReader();
+
+                fileReader.onload = function (e) {
+                    const typedarray = new Uint8Array(e.target.result);
+
+                    // Load the PDF
+                    pdfjsLib.getDocument(typedarray).promise.then(function (pdf) {
+                        pdfDoc = pdf;
+                        totalPagesEl.textContent = pdf.numPages;
+
+                        // Initial page render
+                        pageNum = 1;
+                        renderPage(pageNum);
+
+                        // Extract text from all pages
+                        extractTextFromPDF(pdf);
+                    });
+                };
+
+                fileReader.readAsArrayBuffer(file);
+            }
+
+            // Render PDF page
+            function renderPage(num) {
+                pageRendering = true;
+
+                // Get page
+                pdfDoc.getPage(num).then(function (page) {
+                    const viewport = page.getViewport({ scale });
+
+                    // Create canvas for this page
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    // Clear previous page
+                    if (num === 1) {
+                        pdfContainer.innerHTML = '';
+                    }
+
+                    pdfContainer.appendChild(canvas);
+
+                    // Render PDF page into canvas context
+                    const renderContext = {
+                        canvasContext: ctx,
+                        viewport: viewport
+                    };
+
+                    const renderTask = page.render(renderContext);
+
+                    // Wait for rendering to finish
+                    renderTask.promise.then(function () {
+                        pageRendering = false;
+                        currentPageEl.textContent = num;
+
+                        if (pageNumPending !== null) {
+                            // New page rendering is pending
+                            renderPage(pageNumPending);
+                            pageNumPending = null;
+                        }
+                    });
+                });
+            }
+
+            // Queue rendering if another page rendering in progress
+            function queueRenderPage(num) {
+                if (pageRendering) {
+                    pageNumPending = num;
+                } else {
+                    renderPage(num);
+                }
+            }
+
+            // Extract text from PDF
+            async function extractTextFromPDF(pdf) {
+                extractionStatus.textContent = "Extracting text from PDF...";
+
+                try {
+                    let fullText = "";
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += pageText + "\n\n--- Page " + i + " ---\n\n";
+
+                        // Update status
+                        extractionStatus.textContent = `Extracting text: ${i} of ${pdf.numPages} pages`;
+                    }
+
+                    documentText = fullText;
+                    extractionStatus.textContent = "Text extraction complete! You can now generate MCQ questions.";
+
+                    // Enable quiz generation
+                    generateQuizBtn.disabled = false;
+
+                } catch (error) {
+                    console.error("Error extracting text: ", error);
+                    extractionStatus.textContent = "Error extracting text from PDF.";
+                    showError("Failed to extract text from the PDF. Please try another document.");
+                }
+            }
+
+            // Generate MCQ questions using Groq AI
+            async function generateMCQQuestions(numQuestions, difficulty, topic) {
+                try {
+                    // Prepare the context and instruction
+                    const topicPrompt = topic ? `The topic for the questions should be: ${topic}` : '';
+
+                    const prompt = `
+I need you to generate ${numQuestions} multiple-choice questions (MCQs) based on the content of a PDF document. Below is the extracted text from the document:
+
+---DOCUMENT TEXT START---
+${documentText.length > 15000 ? documentText.substring(0, 15000) + "... [Text truncated due to length]" : documentText}
+---DOCUMENT TEXT END---
+
+Please create ${numQuestions} ${difficulty}-level MCQ questions based on the document content. ${topicPrompt}
+
+Each question must follow this JSON format exactly:
+{
+    "question": "The question text goes here?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": "The exact text of the correct option",
+    "explanation": "Brief explanation of why this is the correct answer"
+}
+
+Important guidelines:
+1. The questions should test comprehension and understanding of the document's content
+2. Each question must have exactly 4 options (A, B, C, D)
+3. Make the incorrect options plausible but clearly wrong to someone who understood the document
+4. Ensure the correct answer is explicitly supported by the document text
+5. Your response should be a valid JSON array containing all ${numQuestions} questions
+6. Ensure each question has a single unambiguous correct answer
+
+Return only the JSON array with the questions, no other text.
+`;
+
+                    // Send request to Groq API
+                    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${GROQ_API_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: "llama-3.1-8b-instant",
+                            messages: [
+                                {
+                                    role: 'system',
+                                    content: 'You are an AI assistant specialized in creating educational assessment materials. Create high-quality multiple-choice questions that accurately test understanding of provided content.'
+                                },
+                                {
+                                    role: 'user',
+                                    content: prompt
+                                }
+                            ],
+                            temperature: 0.2,
+                            max_tokens: 2048
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error?.message || `HTTP error ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const mcqResponse = data.choices[0]?.message?.content || '[]';
+
+                    // Parse the JSON response
+                    try {
+                        // Try to extract JSON from the response if it contains non-JSON content
+                        const jsonMatch = mcqResponse.match(/\[[\s\S]*\]/);
+                        const jsonStr = jsonMatch ? jsonMatch[0] : mcqResponse;
+
+                        const questions = JSON.parse(jsonStr);
+
+                        // Validate the format
+                        if (!Array.isArray(questions) || questions.length === 0) {
+                            throw new Error('Invalid response format - expected an array of questions');
+                        }
+
+                        // Validate each question
+                        questions.forEach(q => {
+                            if (!q.question || !Array.isArray(q.options) || q.options.length !== 4 || !q.correctAnswer || !q.explanation) {
+                                throw new Error('Invalid question format');
+                            }
+                        });
+
+                        return questions;
+                    } catch (error) {
+                        console.error('Error parsing MCQ response:', error, mcqResponse);
+                        throw new Error('Failed to parse AI response. Please try again with different parameters.');
+                    }
+
+                } catch (error) {
+                    console.error('Error calling Groq API:', error);
+                    throw new Error('Failed to generate questions. Please try again.');
+                }
+            }
+
+            function getScoreMessage(percentage) {
+    if (percentage >= 90) {
+        return "Excellent! You have a great understanding of the material.";
+    } else if (percentage >= 70) {
+        return "Good job! You understand most of the material.";
+    } else if (percentage >= 50) {
+        return "Not bad. You might want to review some concepts.";
+    } else {
+        return "You should spend more time studying this material.";
+    }
+}
+            function displayCurrentQuestion() {
+                if (!quizQuestions.length) return;
+
+                const currentQuestion = quizQuestions[currentQuestionIndex];
+                currentQuestionEl.textContent = currentQuestionIndex + 1;
+
+                // Update progress bar
+                const progressPercent = ((currentQuestionIndex + 1) / quizQuestions.length) * 100;
+                progressFill.style.width = `${progressPercent}%`;
+
+                let questionHTML = `
+        <div class="question-container">
+            <div class="question-text">Question ${currentQuestionIndex + 1}: ${currentQuestion.question}</div>
+            <div class="options-container">
+    `;
+
+                currentQuestion.options.forEach((option, index) => {
+                    const optionLetter = String.fromCharCode(65 + index); // A, B, C, D
+                    const isSelected = userAnswers[currentQuestionIndex] === option;
+
+                    let classes = 'option-item';
+                    if (isSelected) classes += ' selected';
+
+                    if (quizSubmitted) {
+                        const isCorrect = option === currentQuestion.correctAnswer;
+                        if (isSelected && isCorrect) classes += ' correct';
+                        else if (isSelected && !isCorrect) classes += ' incorrect';
+                        else if (isCorrect) classes += ' correct';
+                    }
+
+                    questionHTML += `
+            <div class="${classes}" data-option="${option}">
+                <span class="option-letter">${optionLetter}.</span>
+                <span class="option-text">${option}</span>
+            </div>
+        `;
+                });
+
+                questionHTML += `</div>`;
+
+                // Add explanation if quiz is submitted
+                if (quizSubmitted) {
+                    questionHTML += `
+            <div class="explanation" style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-left: 3px solid var(--primary);">
+                <strong>Explanation:</strong> ${currentQuestion.explanation}
+            </div>
+        `;
+                }
+
+                questionHTML += `</div>`;
+
+                // Add navigation buttons
+                questionHTML += `
+        <div class="question-nav">
+            <button id="prev-question-btn" ${currentQuestionIndex === 0 ? 'disabled' : ''}>Previous</button>
+            <div>
+                ${quizSubmitted ?
+                        '' :
+                        `<button id="submit-quiz-btn" ${quizQuestions.some((_, i) => userAnswers[i] === null) ? 'disabled' : ''}>Submit Quiz</button>`
+                    }
+            </div>
+            <button id="next-question-btn" ${currentQuestionIndex === quizQuestions.length - 1 ? 'disabled' : ''}>Next</button>
+        </div>
+    `;
+
+                // Add results if quiz is submitted
+                if (quizSubmitted) {
+                    const correctAnswers = userAnswers.filter((answer, index) =>
+                        answer === quizQuestions[index].correctAnswer
+                    ).length;
+
+                    const percentage = Math.round((correctAnswers / quizQuestions.length) * 100);
+
+                    questionHTML += `
+            <div class="quiz-results">
+                <h3>Quiz Results</h3>
+                <div class="quiz-score">${correctAnswers} / ${quizQuestions.length} (${percentage}%)</div>
+                <p>${getScoreMessage(percentage)}</p>
+            </div>
+        `;
+                }
+
+                quizContainer.innerHTML = questionHTML;
+
+                // Add event listeners to options
+                if (!quizSubmitted) {
+                    const options = document.querySelectorAll('.option-item');
+                    options.forEach(option => {
+                        option.addEventListener('click', () => {
+                            const optionValue = option.getAttribute('data-option');
+                            userAnswers[currentQuestionIndex] = optionValue;
+
+                            // Remove 'selected' class from all options
+                            options.forEach(opt => opt.classList.remove('selected'));
+
+                            // Add 'selected' class to the clicked option
+                            option.classList.add('selected');
+
+                            // Enable submit button if all questions have answers
+                            const submitBtn = document.getElementById('submit-quiz-btn');
+                            if (submitBtn) {
+                                submitBtn.disabled = userAnswers.some(answer => answer === null);
+                            }
+                        });
+                    });
+                }
+
+                // Add event listeners to navigation buttons after they're created
+                const prevBtn = document.getElementById('prev-question-btn');
+                if (prevBtn) {
+                    prevBtn.addEventListener('click', previousQuestion);
+                }
+
+                const nextBtn = document.getElementById('next-question-btn');
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', nextQuestion);
+                }
+
+                // Add event listener for submit button
+                const submitBtn = document.getElementById('submit-quiz-btn');
+                if (submitBtn) {
+                    submitBtn.addEventListener('click', () => {
+                        quizSubmitted = true;
+                        displayCurrentQuestion();  // Re-render with results
+                    });
+                }
+            }
+
+            function nextQuestion() {
+                if (currentQuestionIndex < quizQuestions.length - 1) {
+                    currentQuestionIndex++;
+                    displayCurrentQuestion();
+                }
+            }
+
+            function previousQuestion() {
+                if (currentQuestionIndex > 0) {
+                    currentQuestionIndex--;
+                    displayCurrentQuestion();
+                }
+            }
+
+            // Event listeners
+            document.getElementById('prev-question-btn').addEventListener('click', previousQuestion);
+            document.getElementById('next-question-btn').addEventListener('click', nextQuestion);
+
+            // Start the quiz
+            generateQuestions().then(questions => {
+                quizQuestions = questions;
+                displayCurrentQuestion();
+            });
+        })
+    </script>
+</body>
+
+</html>
