@@ -29,6 +29,4 @@ Access directly through your browser at [PDF MCQ Quiz Generator](https://jeyacha
 
 Built with PDF.js, Groq API, HTML5, CSS3, and JavaScript. All PDF processing happens in your browser for privacy.
 
-## Support
 
-For questions or issues, contact: support@example.com
